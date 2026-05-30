@@ -1,8 +1,9 @@
 import { StrictMode, useContext } from "react";
 import { createRoot } from "react-dom/client";
-import DaroboApp from "./Darobo";
+import Darobo_collect from "./Darobo";
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <DaroboApp />
+    <Darobo_collect />
   </StrictMode>,
 );
