@@ -1,35 +1,37 @@
 import { useState, useEffect, useRef } from "react";
 
+import { supabase } from "./supa_client";
+
+
 // ─── Firebase Initializer ─────────────────────────────────────────────────────
 import { initializeApp } from "firebase/app";
 import { collection, serverTimestamp } from "firebase/firestore";
-import { doc, addDoc, setDoc } from "firebase/firestore";
+import { doc, getDocs, addDoc, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
 // ─── Survey data ──────────────────────────────────────────────────────────────
 const SURVEYS = {
-  chama: {
-    id: "realestate",
-    title: "Real Estate — Landlords",
+  chamas: {
+    id: "chama",
+    title: "Chama Secretaries & SACCO",
     subtitle: "H1 & H2 Hypothesis Validation",
-    icon: "🏘",
-    color: "#2563EB",
+    icon: "📝",
     sections: [
       {
         id: "screener",
-        title: "Screener & Context",
+        title: "Screener & Demographics",
         part: "Part A",
         questions: [
           {
             id: "Q1",
             type: "single",
             required: true,
-            text: "Do you own or manage rental property in Kenya?",
-            swahili: "Je, unamiliki au kusimamia nyumba za kupanga Kenya?",
+            text: "Are you currently a member or officer of a chama?",
+            swahili: "Je, wewe ni mwanachama au afisa wa chama sasa hivi?",
             options: [
-              "Yes, I own and manage directly",
-              "Yes, I own but use an agent",
-              "I manage property on behalf of an owner",
+              "Yes, I am a chama/group member",
+              "Yes, I am a SACCO member",
+              "Yes, I am a secretary or treasurer",
               "No → End survey",
             ],
             endSurveyOn: ["No → End survey"],
@@ -38,52 +40,370 @@ const SURVEYS = {
             id: "Q2",
             type: "single",
             required: true,
-            text: "How many rental units do you currently have tenants in?",
-            swahili:
-              "Una vyumba au nyumba ngapi za kupanga zenye wapangaji sasa hivi?",
-            options: ["1 unit", "2–5 units", "6–10 units", "More than 10"],
+            text: "How long have you been a member?",
+            swahili: "Umekuwa mwanachama kwa muda gani?",
+            options: [
+              "Less than 1 year",
+              "1–3 years",
+              "4–7 years",
+              "More than 7 years",
+            ],
           },
           {
             id: "Q3",
             type: "single",
             required: true,
-            text: "What is the typical monthly rent for your units?",
+            text: "What is the approximate total value of funds your chama manages per month?",
             swahili:
-              "Kodi ya kawaida ya kila mwezi kwa nyumba zako ni kiasi gani?",
+              "Kiasi cha fedha kinachoshughulikiwa na chama yako kwa mwezi ni kingapi takriban?",
             options: [
-              "Below KSh 5,000",
-              "KSh 5,000–15,000",
-              "KSh 15,001–40,000",
-              "Above KSh 40,000",
+              "Below KSh 50,000",
+              "KSh 50,000–200,000",
+              "KSh 200,000–1,000,000",
+              "Above KSh 1,000,000",
             ],
           },
+        ],
+      },
+      {
+        id: "documentation",
+        title: "Documentation Habits",
+        part: "Part B — H1 Pain Signal",
+        questions: [
           {
             id: "Q4",
             type: "multi",
             required: false,
-            text: "When a new tenant moves in, what documents do you use?",
-            swahili: "Mpangaji mpya anapoingia, unatumia nyaraka gani?",
+            text: "What does your chama use to document loan agreements, contribution rules, or member decisions?",
+            swahili:
+              "Chama yako hutumia nini kwa ajili ya kuandika makubaliano ya mikopo?",
             options: [
-              "Handwritten agreement",
-              "Printed tenancy agreement form",
-              "Lawyer-drafted lease",
-              "WhatsApp message confirming terms",
-              "Verbal agreement only",
-              "Nothing formal",
+              "A written paper register",
+              "A printed agreement form",
+              "WhatsApp messages",
+              "A lawyer-drafted contract",
+              "Verbal agreement with witnesses",
+              "Nothing",
               "Other",
             ],
+          },
+          {
+            id: "Q5",
+            type: "single",
+            required: true,
+            text: "When a new member joins and receives a loan, is there a signed written agreement?",
+            swahili:
+              "Mwanachama mpya anapojiunga na kupata mkopo, je, kuna makubaliano ya maandishi yaliyosainiwa?",
+            options: ["Always", "Sometimes", "Rarely", "Never"],
+          },
+          {
+            id: "Q6",
+            type: "single",
+            required: true,
+            core: true,
+            coreLabel: "Core H1",
+            text: "Has your chama ever been unable to enforce a loan or contribution because there was no written proof?",
+            swahili:
+              "Je, chama yako imewahi kushindwa kutekeleza mkopo au mchango kwa sababu hakukuwa na uthibitisho wa maandishi?",
+            options: [
+              "Yes, it happened",
+              "Yes, more than once",
+              "Not yet, but I worry it could happen",
+              "No, we have not had this problem",
+            ],
+          },
+          {
+            id: "Q7",
+            type: "single",
+            required: false,
+            text: "Think of the worst dispute or loss. How much did it cost?",
+            swahili:
+              "Fikiria mgogoro mbaya zaidi au hasara. Iligharamu kiasi gani?",
+            options: [
+              "We have not had such a dispute",
+              "Below KSh 5,000",
+              "KSh 5,000–50,000",
+              "KSh 50,000–200,000",
+              "Above KSh 200,000",
+              "We lost members, not just money",
+            ],
+          },
+          {
+            id: "Q8",
+            type: "single",
+            required: false,
+            text: "In the last 12 months, how many members have left your chama due to a disagreement over money or terms?",
+            swahili:
+              "Katika miezi 12 iliyopita, wanachama wangapi wameacha chama yako?",
+            options: ["None", "1–2 members", "3–5 members", "More than 5"],
+          },
+          {
+            id: "Q9",
+            type: "scale",
+            required: true,
+            text: "How big a problem is the lack of proper documentation for your group? Rate from 1 to 5.",
+            swahili:
+              "Ukosefu wa nyaraka sahihi ni tatizo kubwa kiasi gani? Toa alama 1–5.",
+            min: 1,
+            max: 5,
+            labels: [
+              "1 — Not a problem",
+              "2 — Minor",
+              "3 — Moderate",
+              "4 — Serious",
+              "5 — Very serious",
+            ],
+          },
+        ],
+      },
+      {
+        id: "workarounds",
+        title: "Current Workarounds",
+        part: "Part C",
+        questions: [
+          {
+            id: "Q10",
+            type: "multi",
+            required: false,
+            text: "When there is a dispute, where do members currently go to resolve it?",
+            swahili:
+              "Mgogoro unapotokea, wanachama huenda wapi kwa sasa kuusuluhisha?",
+            options: [
+              "We resolve it internally",
+              "Village elder or community leader",
+              "Lawyer or paralegal",
+              "Police or local chief",
+              "Court",
+              "We give up — no recourse",
+            ],
+          },
+          {
+            id: "Q11",
+            type: "single",
+            required: false,
+            text: "What is the biggest reason your group does not use formal written contracts today?",
+            swahili:
+              "Sababu kubwa zaidi ya chama yako kutotumia mikataba rasmi ni nini?",
+            options: [
+              "Too expensive",
+              "Too complicated",
+              "We trust each other",
+              "We do not know how",
+              "Even written contracts do not help in court",
+              "Other",
+            ],
+          },
+          {
+            id: "Q12",
+            type: "single",
+            required: true,
+            text: "If a simple, affordable tool existed to document and sign group agreements using only a phone — how likely would you be to use it?",
+            swahili:
+              "Kama zana rahisi ingewezesha kuandika na kusaini makubaliano ya kikundi kwa simu tu — ungependa kuitumia?",
+            options: [
+              "Definitely yes",
+              "Probably yes",
+              "Not sure",
+              "Probably not",
+              "Definitely not",
+            ],
+          },
+        ],
+      },
+      {
+        id: "wtp",
+        title: "Willingness to Pay",
+        part: "Part D — H2 Signal",
+        questions: [
+          {
+            id: "Q13",
+            type: "single",
+            required: true,
+            core: true,
+            coreLabel: "Core H2",
+            text: "Would you pay for a tool that: (1) creates a legal agreement in under 5 minutes, (2) both parties sign by PIN on any phone, and (3) produces a tamper-proof record stored online?",
+            swahili:
+              "Je, ungelipa kwa zana ambayo: (1) huunda makubaliano ya kisheria chini ya dakika 5, (2) pande zote zinasaini kwa nambari ya siri, na (3) inatoa rekodi isiyoweza kubadilishwa?",
+            options: [
+              "Yes, I would pay personally",
+              "Yes, if the group pays",
+              "Maybe, depends on the price",
+              "No",
+            ],
+          },
+          {
+            id: "Q14",
+            type: "single",
+            required: false,
+            text: "Per single agreement (e.g. one loan contract), what is the maximum you would pay?",
+            swahili:
+              "Kwa makubaliano moja, kiwango cha juu zaidi unachoweza kulipa ni kiasi gani?",
+            options: [
+              "KSh 0 — I would not pay",
+              "KSh 10–30",
+              "KSh 31–100",
+              "KSh 101–300",
+              "KSh 301–500",
+              "Above KSh 500",
+            ],
+          },
+          {
+            id: "Q15",
+            type: "single",
+            required: false,
+            text: "Who should pay for each agreement — the individual member, the chama as an institution, or split equally?",
+            swahili:
+              "Nani alipe kwa kila makubaliano — mwanachama mmoja mmoja, chama kama taasisi, au kugawana?",
+            options: [
+              "The individual member",
+              "The chama or SACCO pays for everyone",
+              "Split equally",
+              "Whoever benefits more should pay",
+            ],
+          },
+          {
+            id: "Q16",
+            type: "single",
+            required: false,
+            text: "If the chama paid a flat monthly fee for unlimited agreement signing — how much per month would be reasonable?",
+            swahili:
+              "Kama chama ingelipa ada ya kila mwezi kwa usaini usio na kikomo — kiasi gani kwa mwezi kingekuwa cha msingi?",
+            options: [
+              "Below KSh 200/month",
+              "KSh 200–500/month",
+              "KSh 500–2,000/month",
+              "Above KSh 2,000/month",
+              "Would not want this model",
+            ],
+          },
+          {
+            id: "Q17",
+            type: "single",
+            required: true,
+            text: "Would you trust a document signed using a phone PIN and stored online — more, same, or less than a paper agreement signed in front of witnesses?",
+            swahili:
+              "Je, utaamini zaidi, sawa, au kidogo hati iliyosainiwa kwa simu — kuliko makubaliano ya karatasi mbele ya mashahidi?",
+            options: ["More", "Same", "Less", "I do not know"],
+          },
+        ],
+      },
+      {
+        id: "adoption",
+        title: "Adoption & Barriers",
+        part: "Part E",
+        questions: [
+          {
+            id: "Q18",
+            type: "multi",
+            required: false,
+            text: "What would make you decide NOT to use a digital signing tool for your group agreements?",
+            swahili:
+              "Ni nini kinachoweza kukufanya usitumie zana ya usaini wa kidijitali?",
+            options: [
+              "Older members cannot use phones",
+              "Do not trust it in court",
+              "Privacy concerns — who sees our data?",
+              "Cost too high",
+              "Internet not reliable in our area",
+              "Fear of losing PIN",
+              "No reason — I would use it",
+            ],
+          },
+          {
+            id: "Q19",
+            type: "single",
+            required: false,
+            text: "Does your chama have members who use only a basic (non-smartphone) phone?",
+            swahili:
+              "Je, chama yako ina wanachama wanaotumia simu ya kawaida tu?",
+            options: [
+              "Yes, most members",
+              "Yes, some members",
+              "Very few",
+              "No, all use smartphones",
+            ],
+          },
+          {
+            id: "Q20",
+            type: "single",
+            required: false,
+            text: "Who would you most trust to introduce a new tool like this to your group?",
+            swahili:
+              "Ni nani ungependa kuwasilisha zana mpya kama hii kwa kikundi chako?",
+            options: [
+              "An M-Pesa agent we already use",
+              "Our SACCO or bank",
+              "A friend or member who tried it",
+              "A lawyer or legal professional",
+              "The chama/SACCO secretary or chairperson",
+            ],
+          },
+        ],
+      },
+      {
+        id: "secretary",
+        title: "Secretary Track",
+        part: "Part F — Secretary Only",
+        questions: [
+          {
+            id: "Q21",
+            type: "single",
+            required: false,
+            text: "As secretary, how many agreements do you draft or witness per month on average?",
+            swahili:
+              "Kama katibu, unakubaliwa au unashuhudia makubaliano mangapi kwa wastani kwa mwezi?",
+            options: ["1–5", "6–15", "16–50", "More than 50"],
+          },
+          {
+            id: "Q22",
+            type: "single",
+            required: false,
+            text: "On average, how much time do you spend per week managing documentation, reminders, and disputes?",
+            swahili:
+              "Kwa wastani, unatumia muda gani kwa wiki kusimamia nyaraka, vikumbusho, na migogoro?",
+            options: [
+              "Under 1 hour",
+              "1–3 hours",
+              "4–8 hours",
+              "More than 8 hours",
+            ],
+          },
+          {
+            id: "Q23",
+            type: "single",
+            required: false,
+            text: "If you could reduce your documentation and dispute workload by 80%, would that make your role as secretary easier?",
+            swahili:
+              "Kama ungeweza kupunguza mzigo wako wa nyaraka na migogoro kwa asilimia 80, hilo lingelifanya kazi yako rahisi zaidi?",
+            options: ["Yes, significantly", "Yes, somewhat", "Not sure", "No"],
+          },
+          {
+            id: "Q24",
+            type: "single",
+            required: false,
+            text: "Would you be willing to try a free version of this tool for one month and give us your honest feedback?",
+            swahili:
+              "Je, uko tayari kujaribu toleo la bure la zana hii kwa mwezi mmoja?",
+            options: ["Yes — collect contact", "Maybe — tell me more", "No"],
+          },
+          {
+            id: "Q25",
+            type: "open",
+            required: false,
+            text: "In your own words — what is the one thing you most need to make your chama or SACCO agreements more secure?",
+            swahili:
+              "Kwa maneno yako mwenyewe — ni kitu gani kimoja unachohitaji zaidi ili kufanya makubaliano yako kuwa salama zaidi?",
           },
         ],
       },
     ],
   },
 
-  realestate: {
-    id: "realestate",
+  landlords: {
+    id: "landlord",
     title: "Real Estate — Landlords",
     subtitle: "H1 & H2 Hypothesis Validation",
-    icon: "🏘",
-    color: "#2563EB",
+    icon: "📝",
     sections: [
       {
         id: "screener",
@@ -127,6 +447,13 @@ const SURVEYS = {
               "Above KSh 40,000",
             ],
           },
+        ],
+      },
+      {
+        id: "documentation",
+        title: "Documentation Practices",
+        part: "Part B — H1 Pain Signal",
+        questions: [
           {
             id: "Q4",
             type: "multi",
@@ -142,6 +469,664 @@ const SURVEYS = {
               "Nothing formal",
               "Other",
             ],
+          },
+          {
+            id: "Q5",
+            type: "single",
+            required: false,
+            text: "When a tenant pays a deposit, how do you document it?",
+            swahili: "Mpangaji anapopiga amana, unairekodi vipi?",
+            options: [
+              "Written receipt signed by both parties",
+              "M-Pesa transaction record only",
+              "Verbal acknowledgment",
+              "WhatsApp message",
+              "Nothing",
+            ],
+          },
+          {
+            id: "Q6",
+            type: "single",
+            required: true,
+            core: true,
+            coreLabel: "Core H1",
+            text: "In the past 12 months, have you had a dispute with a tenant over rent, deposit, repairs, or the terms of their agreement?",
+            swahili:
+              "Katika miezi 12 iliyopita, je, umekuwa na mgogoro na mpangaji kuhusu kodi, amana, ukarabati, au masharti ya makubaliano?",
+            options: [
+              "Yes, and I lost money",
+              "Yes, and the tenant left without paying",
+              "Yes, but we resolved it",
+              "Not in the last 12 months, but in the past",
+              "Never",
+            ],
+          },
+          {
+            id: "Q7",
+            type: "single",
+            required: false,
+            text: "When that dispute happened — did you have a signed written agreement covering the disputed point?",
+            swahili:
+              "Mgogoro huo ulipotokea — je, ulikuwa na makubaliano ya maandishi yaliyosainiwa?",
+            options: [
+              "Yes, but the tenant denied it",
+              "We had an agreement but it did not cover this point",
+              "No, we had no written agreement",
+              "Not applicable",
+            ],
+          },
+          {
+            id: "Q8",
+            type: "single",
+            required: false,
+            text: "What was the approximate financial cost of your worst tenancy dispute?",
+            swahili:
+              "Gharama ya takriban ya fedha ya mgogoro wako mbaya zaidi na mpangaji ilikuwa kiasi gani?",
+            options: [
+              "Below KSh 5,000",
+              "KSh 5,000–30,000",
+              "KSh 30,001–100,000",
+              "Above KSh 100,000",
+              "I have not had such a dispute",
+            ],
+          },
+          {
+            id: "Q9",
+            type: "scale",
+            required: true,
+            text: "How big a problem is the lack of proper rental documentation for you? Rate 1–5.",
+            swahili:
+              "Ukosefu wa nyaraka sahihi za kukodisha ni tatizo kubwa kiasi gani kwako?",
+            min: 1,
+            max: 5,
+            labels: [
+              "1 — No problem",
+              "2 — Minor",
+              "3 — Moderate",
+              "4 — Serious",
+              "5 — Very serious",
+            ],
+          },
+          {
+            id: "Q10",
+            type: "single",
+            required: false,
+            text: "On average, how many tenants move out per year leaving a dispute unresolved?",
+            swahili:
+              "Kwa wastani, wapangaji wangapi wanaondoka kwa mwaka wakiacha mgogoro bila kutatuliwa?",
+            options: ["None", "1 tenant", "2–3 tenants", "More than 3"],
+          },
+        ],
+      },
+      {
+        id: "workarounds",
+        title: "Current Workarounds",
+        part: "Part C",
+        questions: [
+          {
+            id: "Q11",
+            type: "multi",
+            required: false,
+            text: "When a tenant dispute turns serious, where do you currently go for help?",
+            swahili:
+              "Mgogoro na mpangaji ukiwa mkubwa, unakwenda wapi kwa msaada sasa hivi?",
+            options: [
+              "Resolve it myself",
+              "Local chief or village elder",
+              "Estate agent or caretaker",
+              "Lawyer",
+              "Rent Tribunal",
+              "I give up and absorb the loss",
+            ],
+          },
+          {
+            id: "Q12",
+            type: "single",
+            required: false,
+            text: "Why don't you use a lawyer-drafted lease for all your tenancies?",
+            swahili:
+              "Kwa nini hutumii mkataba ulioundwa na wakili kwa wapangaji wako wote?",
+            options: [
+              "Too expensive (KSh 5,000–30,000 per lease)",
+              "Too slow — tenants won't wait",
+              "Unnecessary for low-rent units",
+              "I don't know where to get one",
+              "I already use a standard agreement",
+            ],
+          },
+        ],
+      },
+      {
+        id: "wtp",
+        title: "Willingness to Pay",
+        part: "Part D — H2 Signal",
+        questions: [
+          {
+            id: "Q13",
+            type: "single",
+            required: true,
+            core: true,
+            coreLabel: "Core H2",
+            text: "Imagine a tool that creates a legally enforceable tenancy agreement in 5 minutes. The tenant signs from their phone using a PIN. The signed agreement is stored permanently online and can be used in court. Would you pay for this?",
+            swahili:
+              "Fikiria zana inayounda makubaliano ya kukodisha yenye nguvu ya kisheria kwa dakika 5. Je, ungelipa kwa hili?",
+            options: [
+              "Yes, definitely",
+              "Yes, if it is affordable",
+              "Maybe",
+              "No",
+            ],
+          },
+          {
+            id: "Q14",
+            type: "single",
+            required: false,
+            core: true,
+            coreLabel: "Core H2",
+            text: "Per tenancy agreement, what is the maximum you would pay?",
+            swahili:
+              "Kwa kila makubaliano ya kukodisha, kiwango cha juu zaidi unachoweza kulipa ni kiasi gani?",
+            options: [
+              "KSh 0 — would not pay",
+              "KSh 50–100",
+              "KSh 101–300",
+              "KSh 301–500",
+              "KSh 501–1,000",
+              "Above KSh 1,000",
+            ],
+          },
+          {
+            id: "Q15",
+            type: "single",
+            required: false,
+            text: "If a monthly subscription gave you unlimited agreements for all your units — what price per month would feel fair?",
+            swahili:
+              "Kama usajili wa kila mwezi ulikupa makubaliano yasiyokuwa na kikomo — bei gani kwa mwezi ingeonekana kuwa ya haki?",
+            options: [
+              "Below KSh 200/month",
+              "KSh 200–500/month",
+              "KSh 501–1,000/month",
+              "Above KSh 1,000/month",
+              "I prefer paying per agreement",
+            ],
+          },
+          {
+            id: "Q16",
+            type: "single",
+            required: false,
+            text: "If your property agent offered this service as part of their fees, would you prefer that to paying separately?",
+            swahili:
+              "Kama wakala wako wa nyumba alitoa huduma hii kama sehemu ya ada zake, ungependelea hivyo badala ya kulipa tofauti?",
+            options: [
+              "Yes — easier if bundled",
+              "No — I'd rather control it myself",
+              "I don't use an agent",
+            ],
+          },
+        ],
+      },
+      {
+        id: "adoption",
+        title: "Adoption & Barriers",
+        part: "Part E",
+        questions: [
+          {
+            id: "Q17",
+            type: "single",
+            required: false,
+            text: "Would your tenants be able to sign a digital lease using only a basic phone and a PIN?",
+            swahili:
+              "Je, wapangaji wako wangeweza kusaini mkataba wa kidijitali kwa kutumia simu ya kawaida tu na nambari ya siri?",
+            options: [
+              "Yes, most of them",
+              "Some, but not all",
+              "Probably not — most are not tech-savvy",
+              "I'm not sure",
+            ],
+          },
+          {
+            id: "Q18",
+            type: "multi",
+            required: false,
+            text: "What would stop you from using a digital signing tool?",
+            swahili:
+              "Ni nini kinachoweza kukuzuia kutumia zana ya usaini wa kidijitali?",
+            options: [
+              "Not sure if courts accept it",
+              "Tenants won't trust it",
+              "Cost too high",
+              "Privacy — who sees my agreement?",
+              "Too complicated for me",
+              "Nothing — I would use it",
+            ],
+          },
+          {
+            id: "Q19",
+            type: "single",
+            required: false,
+            text: "If this tool worked via M-Pesa — so you pay for the signing and the agreement at the same time — would that make it easier to use?",
+            swahili:
+              "Kama zana hii ingefanya kazi kupitia M-Pesa — ili uweze kulipa usaini na makubaliano wakati mmoja — hiyo ingekufanya iwe rahisi kutumia?",
+            options: [
+              "Yes, much easier",
+              "Somewhat",
+              "Makes no difference",
+              "No, I'd prefer another payment method",
+            ],
+          },
+          {
+            id: "Q20",
+            type: "single",
+            required: false,
+            text: "Who would you most trust to offer you this service?",
+            swahili: "Ni nani unayemwamini zaidi kutoa huduma hii?",
+            options: [
+              "My current property agent",
+              "My bank or M-Pesa",
+              "A startup app recommended by a friend",
+              "A government-affiliated service",
+              "A law firm",
+            ],
+          },
+        ],
+      },
+      {
+        id: "close",
+        title: "Close & Pilot Recruitment",
+        part: "Part F",
+        questions: [
+          {
+            id: "Q21",
+            type: "single",
+            required: false,
+            text: "How often do you sign new tenancy agreements per year?",
+            swahili:
+              "Unasaini makubaliano mapya ya kukodisha mara ngapi kwa mwaka?",
+            options: ["1–2", "3–5", "6–12", "More than 12"],
+          },
+          {
+            id: "Q22",
+            type: "open",
+            required: false,
+            text: "In your own words — what is the single most stressful part of managing tenants?",
+            swahili:
+              "Kwa maneno yako mwenyewe — sehemu moja yenye msongo zaidi wa kusimamia wapangaji ni ipi?",
+          },
+          {
+            id: "Q23",
+            type: "single",
+            required: false,
+            text: "Would you be willing to try a free version for 1 month and give us feedback?",
+            swahili:
+              "Je, uko tayari kujaribu toleo la bure kwa mwezi 1 na kutupa maoni?",
+            options: ["Yes — collect contact", "Maybe — tell me more", "No"],
+          },
+        ],
+      },
+    ],
+  },
+
+  agents: {
+    id: "agent",
+    title: "Real Estate — Agents",
+    subtitle: "H1 & H2 Hypothesis Validation",
+    icon: "📝",
+    sections: [
+      {
+        id: "screener",
+        title: "Screener & Context",
+        part: "Part A",
+        questions: [
+          {
+            id: "Q1",
+            type: "single",
+            required: true,
+            text: "Do you own or manage rental property in Kenya?",
+            swahili: "Je, unamiliki au kusimamia nyumba za kupanga Kenya?",
+            options: [
+              "Yes, I own and manage directly",
+              "Yes, I own but use an agent",
+              "I manage property on behalf of an owner",
+              "No → End survey",
+            ],
+            endSurveyOn: ["No → End survey"],
+          },
+          {
+            id: "Q2",
+            type: "single",
+            required: true,
+            text: "How many rental units do you currently have tenants in?",
+            swahili:
+              "Una vyumba au nyumba ngapi za kupanga zenye wapangaji sasa hivi?",
+            options: ["1 unit", "2–5 units", "6–10 units", "More than 10"],
+          },
+          {
+            id: "Q3",
+            type: "single",
+            required: true,
+            text: "What is the typical monthly rent for your units?",
+            swahili:
+              "Kodi ya kawaida ya kila mwezi kwa nyumba zako ni kiasi gani?",
+            options: [
+              "Below KSh 5,000",
+              "KSh 5,000–15,000",
+              "KSh 15,001–40,000",
+              "Above KSh 40,000",
+            ],
+          },
+        ],
+      },
+      {
+        id: "documentation",
+        title: "Documentation Practices",
+        part: "Part B — H1 Pain Signal",
+        questions: [
+          {
+            id: "Q4",
+            type: "multi",
+            required: false,
+            text: "When a new tenant moves in, what documents do you use?",
+            swahili: "Mpangaji mpya anapoingia, unatumia nyaraka gani?",
+            options: [
+              "Handwritten agreement",
+              "Printed tenancy agreement form",
+              "Lawyer-drafted lease",
+              "WhatsApp message confirming terms",
+              "Verbal agreement only",
+              "Nothing formal",
+              "Other",
+            ],
+          },
+          {
+            id: "Q5",
+            type: "single",
+            required: false,
+            text: "When a tenant pays a deposit, how do you document it?",
+            swahili: "Mpangaji anapopiga amana, unairekodi vipi?",
+            options: [
+              "Written receipt signed by both parties",
+              "M-Pesa transaction record only",
+              "Verbal acknowledgment",
+              "WhatsApp message",
+              "Nothing",
+            ],
+          },
+          {
+            id: "Q6",
+            type: "single",
+            required: true,
+            core: true,
+            coreLabel: "Core H1",
+            text: "In the past 12 months, have you had a dispute with a tenant over rent, deposit, repairs, or the terms of their agreement?",
+            swahili:
+              "Katika miezi 12 iliyopita, je, umekuwa na mgogoro na mpangaji kuhusu kodi, amana, ukarabati, au masharti ya makubaliano?",
+            options: [
+              "Yes, and I lost money",
+              "Yes, and the tenant left without paying",
+              "Yes, but we resolved it",
+              "Not in the last 12 months, but in the past",
+              "Never",
+            ],
+          },
+          {
+            id: "Q7",
+            type: "single",
+            required: false,
+            text: "When that dispute happened — did you have a signed written agreement covering the disputed point?",
+            swahili:
+              "Mgogoro huo ulipotokea — je, ulikuwa na makubaliano ya maandishi yaliyosainiwa?",
+            options: [
+              "Yes, but the tenant denied it",
+              "We had an agreement but it did not cover this point",
+              "No, we had no written agreement",
+              "Not applicable",
+            ],
+          },
+          {
+            id: "Q8",
+            type: "single",
+            required: false,
+            text: "What was the approximate financial cost of your worst tenancy dispute?",
+            swahili:
+              "Gharama ya takriban ya fedha ya mgogoro wako mbaya zaidi na mpangaji ilikuwa kiasi gani?",
+            options: [
+              "Below KSh 5,000",
+              "KSh 5,000–30,000",
+              "KSh 30,001–100,000",
+              "Above KSh 100,000",
+              "I have not had such a dispute",
+            ],
+          },
+          {
+            id: "Q9",
+            type: "scale",
+            required: true,
+            text: "How big a problem is the lack of proper rental documentation for you? Rate 1–5.",
+            swahili:
+              "Ukosefu wa nyaraka sahihi za kukodisha ni tatizo kubwa kiasi gani kwako?",
+            min: 1,
+            max: 5,
+            labels: [
+              "1 — No problem",
+              "2 — Minor",
+              "3 — Moderate",
+              "4 — Serious",
+              "5 — Very serious",
+            ],
+          },
+          {
+            id: "Q10",
+            type: "single",
+            required: false,
+            text: "On average, how many tenants move out per year leaving a dispute unresolved?",
+            swahili:
+              "Kwa wastani, wapangaji wangapi wanaondoka kwa mwaka wakiacha mgogoro bila kutatuliwa?",
+            options: ["None", "1 tenant", "2–3 tenants", "More than 3"],
+          },
+        ],
+      },
+      {
+        id: "workarounds",
+        title: "Current Workarounds",
+        part: "Part C",
+        questions: [
+          {
+            id: "Q11",
+            type: "multi",
+            required: false,
+            text: "When a tenant dispute turns serious, where do you currently go for help?",
+            swahili:
+              "Mgogoro na mpangaji ukiwa mkubwa, unakwenda wapi kwa msaada sasa hivi?",
+            options: [
+              "Resolve it myself",
+              "Local chief or village elder",
+              "Estate agent or caretaker",
+              "Lawyer",
+              "Rent Tribunal",
+              "I give up and absorb the loss",
+            ],
+          },
+          {
+            id: "Q12",
+            type: "single",
+            required: false,
+            text: "Why don't you use a lawyer-drafted lease for all your tenancies?",
+            swahili:
+              "Kwa nini hutumii mkataba ulioundwa na wakili kwa wapangaji wako wote?",
+            options: [
+              "Too expensive (KSh 5,000–30,000 per lease)",
+              "Too slow — tenants won't wait",
+              "Unnecessary for low-rent units",
+              "I don't know where to get one",
+              "I already use a standard agreement",
+            ],
+          },
+        ],
+      },
+      {
+        id: "wtp",
+        title: "Willingness to Pay",
+        part: "Part D — H2 Signal",
+        questions: [
+          {
+            id: "Q13",
+            type: "single",
+            required: true,
+            core: true,
+            coreLabel: "Core H2",
+            text: "Imagine a tool that creates a legally enforceable tenancy agreement in 5 minutes. The tenant signs from their phone using a PIN. The signed agreement is stored permanently online and can be used in court. Would you pay for this?",
+            swahili:
+              "Fikiria zana inayounda makubaliano ya kukodisha yenye nguvu ya kisheria kwa dakika 5. Je, ungelipa kwa hili?",
+            options: [
+              "Yes, definitely",
+              "Yes, if it is affordable",
+              "Maybe",
+              "No",
+            ],
+          },
+          {
+            id: "Q14",
+            type: "single",
+            required: false,
+            core: true,
+            coreLabel: "Core H2",
+            text: "Per tenancy agreement, what is the maximum you would pay?",
+            swahili:
+              "Kwa kila makubaliano ya kukodisha, kiwango cha juu zaidi unachoweza kulipa ni kiasi gani?",
+            options: [
+              "KSh 0 — would not pay",
+              "KSh 50–100",
+              "KSh 101–300",
+              "KSh 301–500",
+              "KSh 501–1,000",
+              "Above KSh 1,000",
+            ],
+          },
+          {
+            id: "Q15",
+            type: "single",
+            required: false,
+            text: "If a monthly subscription gave you unlimited agreements for all your units — what price per month would feel fair?",
+            swahili:
+              "Kama usajili wa kila mwezi ulikupa makubaliano yasiyokuwa na kikomo — bei gani kwa mwezi ingeonekana kuwa ya haki?",
+            options: [
+              "Below KSh 200/month",
+              "KSh 200–500/month",
+              "KSh 501–1,000/month",
+              "Above KSh 1,000/month",
+              "I prefer paying per agreement",
+            ],
+          },
+          {
+            id: "Q16",
+            type: "single",
+            required: false,
+            text: "If your property agent offered this service as part of their fees, would you prefer that to paying separately?",
+            swahili:
+              "Kama wakala wako wa nyumba alitoa huduma hii kama sehemu ya ada zake, ungependelea hivyo badala ya kulipa tofauti?",
+            options: [
+              "Yes — easier if bundled",
+              "No — I'd rather control it myself",
+              "I don't use an agent",
+            ],
+          },
+        ],
+      },
+      {
+        id: "adoption",
+        title: "Adoption & Barriers",
+        part: "Part E",
+        questions: [
+          {
+            id: "Q17",
+            type: "single",
+            required: false,
+            text: "Would your tenants be able to sign a digital lease using only a basic phone and a PIN?",
+            swahili:
+              "Je, wapangaji wako wangeweza kusaini mkataba wa kidijitali kwa kutumia simu ya kawaida tu na nambari ya siri?",
+            options: [
+              "Yes, most of them",
+              "Some, but not all",
+              "Probably not — most are not tech-savvy",
+              "I'm not sure",
+            ],
+          },
+          {
+            id: "Q18",
+            type: "multi",
+            required: false,
+            text: "What would stop you from using a digital signing tool?",
+            swahili:
+              "Ni nini kinachoweza kukuzuia kutumia zana ya usaini wa kidijitali?",
+            options: [
+              "Not sure if courts accept it",
+              "Tenants won't trust it",
+              "Cost too high",
+              "Privacy — who sees my agreement?",
+              "Too complicated for me",
+              "Nothing — I would use it",
+            ],
+          },
+          {
+            id: "Q19",
+            type: "single",
+            required: false,
+            text: "If this tool worked via M-Pesa — so you pay for the signing and the agreement at the same time — would that make it easier to use?",
+            swahili:
+              "Kama zana hii ingefanya kazi kupitia M-Pesa — ili uweze kulipa usaini na makubaliano wakati mmoja — hiyo ingekufanya iwe rahisi kutumia?",
+            options: [
+              "Yes, much easier",
+              "Somewhat",
+              "Makes no difference",
+              "No, I'd prefer another payment method",
+            ],
+          },
+          {
+            id: "Q20",
+            type: "single",
+            required: false,
+            text: "Who would you most trust to offer you this service?",
+            swahili: "Ni nani unayemwamini zaidi kutoa huduma hii?",
+            options: [
+              "My current property agent",
+              "My bank or M-Pesa",
+              "A startup app recommended by a friend",
+              "A government-affiliated service",
+              "A law firm",
+            ],
+          },
+        ],
+      },
+      {
+        id: "close",
+        title: "Close & Pilot Recruitment",
+        part: "Part F",
+        questions: [
+          {
+            id: "Q21",
+            type: "single",
+            required: false,
+            text: "How often do you sign new tenancy agreements per year?",
+            swahili:
+              "Unasaini makubaliano mapya ya kukodisha mara ngapi kwa mwaka?",
+            options: ["1–2", "3–5", "6–12", "More than 12"],
+          },
+          {
+            id: "Q22",
+            type: "open",
+            required: false,
+            text: "In your own words — what is the single most stressful part of managing tenants?",
+            swahili:
+              "Kwa maneno yako mwenyewe — sehemu moja yenye msongo zaidi wa kusimamia wapangaji ni ipi?",
+          },
+          {
+            id: "Q23",
+            type: "single",
+            required: false,
+            text: "Would you be willing to try a free version for 1 month and give us feedback?",
+            swahili:
+              "Je, uko tayari kujaribu toleo la bure kwa mwezi 1 na kutupa maoni?",
+            options: ["Yes — collect contact", "Maybe — tell me more", "No"],
           },
         ],
       },
@@ -151,56 +1136,208 @@ const SURVEYS = {
   tenant: {
     id: "tenant",
     title: "Real Estate — Tenants",
-    subtitle: "Tenant Experience Validation",
-    icon: "🔑",
-    color: "#0891B2",
+    subtitle: "H1 & H2 Hypothesis Validation",
+    icon: "📝",
     sections: [
       {
         id: "screener",
-        title: "Screener & Context",
+        title: "Screener & Rent Context",
         part: "Part A",
         questions: [
           {
             id: "Q1",
             type: "single",
             required: true,
-            text: "Do you currently rent a property in Kenya?",
-            swahili: "Je, unakodisha nyumba Kenya kwa sasa?",
+            text: "Are you currently renting accommodation in Kenya?",
+            swahili: "Je, sasa hivi unakodisha makazi Kenya?",
             options: [
-              "Yes, I rent privately",
-              "Yes, through an agent",
-              "No → End survey",
+              "Yes, I am currently renting / Ndio, ninakodisha sasa hivi",
+              "No, but I rented in the past 2 years / Hapana, lakini nilikodisha miaka 2 iliyopita",
+              "No / Hapana → End survey",
             ],
-            endSurveyOn: ["No → End survey"],
+            endSurveyOn: ["No / Hapana → End survey"],
           },
           {
             id: "Q2",
             type: "single",
             required: true,
-            text: "How much do you pay in monthly rent?",
-            swahili: "Unalipa kodi ngapi kila mwezi?",
+            text: "What is your monthly rent?",
+            swahili: "Kodi yako ya kila mwezi ni kiasi gani?",
             options: [
               "Below KSh 5,000",
-              "KSh 5,000–15,000",
-              "KSh 15,001–40,000",
+              "KSh 5,000-15,000",
+              "KSh 15,001-40,000",
               "Above KSh 40,000",
             ],
           },
+        ],
+      },
+      {
+        id: "documentation",
+        title: "Documentation Pain",
+        part: "Part B — H1 Tenant Signal",
+        questions: [
           {
             id: "Q3",
+            type: "single",
+            required: true,
+            text: "When you moved into your current home, did you sign a written tenancy agreement?",
+            swahili:
+              "Ulipohamia nyumba yako ya sasa, je, ulisaini makubaliano ya kukodisha ya maandishi?",
+            options: [
+              "Yes, a formal printed lease / Ndio, mkataba rasmi uliochapishwa",
+              "Yes, a handwritten agreement / Ndio, makubaliano ya mkono",
+              "Only a verbal agreement / Makubaliano ya mdomo tu",
+              "No agreement at all / Hakuna makubaliano kabisa",
+            ],
+          },
+          {
+            id: "Q4",
+            type: "single",
+            required: true,
+            text: "Have you ever lost a deposit or been overcharged because you had no written proof of what was agreed?",
+            swahili:
+              "Je, umewahi kupoteza amana au kudaiwa zaidi kwa sababu hukuwa na uthibitisho wa maandishi?",
+            options: [
+              "Yes, I lost my deposit / Ndio, nilipoteza amana yangu",
+              "Yes, I was overcharged on rent / Ndio, nilitozwa zaidi ya kodi",
+              "Yes, both / Ndio, vyote viwili",
+              "No, but I worried it could happen / Hapana, lakini niliogopa",
+              "No / Hapana",
+            ],
+          },
+          {
+            id: "Q5",
+            type: "single",
+            required: true,
+            text: "Have you ever moved out of a house because of a dispute with your landlord that you could not resolve?",
+            swahili:
+              "Je, umewahi kuhamia kutoka nyumba kwa sababu ya mgogoro na mwenye nyumba ambao haukuweza kutatuliwa?",
+            options: [
+              "Yes / Ndio",
+              "No, but I know someone who has / Hapana, lakini najua mtu",
+              "No / Hapana",
+            ],
+          },
+          {
+            id: "Q6",
+            type: "single",
+            required: true,
+            text: "When you pay monthly rent via M-Pesa, does your landlord give you a proper written receipt?",
+            swahili:
+              "Unapolipa kodi ya kila mwezi kupitia M-Pesa, je, mwenye nyumba wako anakupa stakabadhi sahihi ya maandishi?",
+            options: [
+              "Always / Wakati wote",
+              "Sometimes / Mara nyingine",
+              "Rarely / Mara chache",
+              "Never - M-Pesa message is all I have / Kamwe",
+            ],
+          },
+          {
+            id: "Q7",
+            type: "scale",
+            required: true,
+            core: true,
+            coreLabel: "Core H1",
+            text: "How serious a problem is having no reliable lease agreement in your rental situation? Rate 1-5.",
+            swahili:
+              "Kukosa makubaliano ya kukodisha ya kuaminika ni tatizo kubwa kiasi gani? Toa alama 1-5.",
+            min: 1,
+            max: 5,
+            labels: [
+              "1 - Not a problem / Si tatizo",
+              "2 - Minor / Dogo",
+              "3 - Moderate / Wastani",
+              "4 - Serious / Kubwa",
+              "5 - Very serious / Kubwa sana",
+            ],
+          },
+        ],
+      },
+      {
+        id: "trust_adoption",
+        title: "Trust & Adoption",
+        part: "Part C — H2 Tenant Trust Signal",
+        questions: [
+          {
+            id: "Q8",
+            type: "single",
+            required: true,
+            text: "Would you trust a tenancy agreement signed using a phone PIN and stored permanently online more, same, or less than a paper lease?",
+            swahili:
+              "Je, utaamini zaidi, sawa, au kidogo makubaliano yaliyosainiwa kwa nambari ya siri ya simu?",
+            options: [
+              "More / Zaidi",
+              "Same / Sawa",
+              "Less / Kidogo",
+              "I don't know / Sijui",
+            ],
+          },
+          {
+            id: "Q9",
+            type: "single",
+            required: true,
+            core: true,
+            coreLabel: "Core H2",
+            text: "If your landlord offered a digitally signed, legally enforceable lease - would you prefer that over a paper one?",
+            swahili:
+              "Kama mwenye nyumba wako alitoa mkataba uliosainiwa kidijitali, ungependa hivyo badala ya karatasi?",
+            options: [
+              "Yes, strongly prefer / Ndio, ninapendelea sana",
+              "Yes, slightly prefer / Ndio, ninapendelea kidogo",
+              "No preference / Sina upendeleo",
+              "Prefer paper / Napendelea karatasi",
+            ],
+          },
+          {
+            id: "Q10",
+            type: "single",
+            required: true,
+            text: "Would you pay a small fee (KSh 20-50) to have your tenancy agreement signed and stored digitally even if your landlord won't pay?",
+            swahili:
+              "Je, ungelipa ada ndogo (KSh 20-50) kuwa na makubaliano yako ya kukodisha yaliyosainiwa na kuhifadhiwa kidijitali?",
+            options: [
+              "Yes / Ndio",
+              "Maybe / Labda",
+              "Only if landlord pays / Tu kama mwenye nyumba atalipa",
+              "No / Hapana",
+            ],
+          },
+          {
+            id: "Q11",
+            type: "single",
+            required: true,
+            text: "What phone do you use?",
+            swahili: "Unatumia simu gani?",
+            options: [
+              "Basic / feature phone (no internet) / Simu ya kawaida (bila mtandao)",
+              "Smartphone, but mostly calls/SMS / Smartphone, lakini hasa simu/SMS",
+              "Smartphone with WhatsApp / Smartphone na WhatsApp",
+              "Smartphone with regular internet / Smartphone na mtandao wa kawaida",
+            ],
+          },
+          {
+            id: "Q12",
             type: "multi",
             required: false,
-            text: "What challenges have you faced with your landlord?",
-            swahili: "Umekutana na matatizo gani na mwenye nyumba?",
+            text: "What would most reassure you that a digital agreement is legitimate and enforceable? (Mark all that apply)",
+            swahili:
+              "Ni nini kinachoweza kukuambia zaidi kwamba makubaliano ya kidijitali ni halali?",
             options: [
-              "Late repairs",
-              "Unfair rent increases",
-              "No written agreement",
-              "Deposit disputes",
-              "Eviction threats",
-              "None",
-              "Other",
+              "My bank or M-Pesa also uses the same system / Benki yangu au M-Pesa pia hutumia mfumo huo huo",
+              "I can verify it online anytime / Ninaweza kuthibitisha mtandaoni wakati wowote",
+              "A friend or neighbour has used it / Rafiki au jirani amewahi kuitumia",
+              "It is approved by the government / Imeidhinishwa na serikali",
+              "A lawyer confirmed it works in court / Wakili alithibitisha inafanya kazi mahakamani",
             ],
+          },
+          {
+            id: "Q13",
+            type: "open",
+            required: false,
+            text: "In your own words, what is the one thing you most wish was different about how rental agreements work in Kenya?",
+            swahili:
+              "Kwa maneno yako mwenyewe, ni kitu gani kimoja unachopenda sana kingekuwa tofauti?",
           },
         ],
       },
@@ -1666,6 +2803,7 @@ const INTERVIEWERS = [
   { id: "INT004", name: "Maxwel Mwania", location: "Nairobi", pin: "1234" },
   { id: "INT005", name: "Juda Mohamed", location: "Mombasa", pin: "1234" },
   { id: "INT006", name: "Michael Kaoto", location: "Mombasa", pin: "1234" },
+  { id: "INT007", name: "Yvonne Ochieng", location: "Nairobi", pin: "1234" },
 ];
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -1775,7 +2913,7 @@ function Toast({ msg, type }) {
 // ─── Firebase write ───────────────────────────────────────────────────────────
 async function toFirebase(data) {
   await setDoc(
-    doc(db, data.surveyId, data.interviewerId),
+    doc(db, "AnswersDB", data.sessionId),
     { ...data },
     { merge: true },
   );
@@ -1807,11 +2945,12 @@ function LoginScreen({ onLogin }) {
   };
 
   return (
+
     <div className="login-screen">
       <div className="login-card">
         <div className="login-header">
           <div className="login-logo">
-            <img src="./public/logo.ico" alt="" className="logo-mark" />
+            <img src="./logo.ico" alt="" className="logo-mark" />
             <div>
               <div className="logo-text">DaroboCollect</div>
               <div className="logo-tagline">Field Research Platform</div>
@@ -1860,34 +2999,12 @@ function LoginScreen({ onLogin }) {
             Sign In →
           </button>
         </div>
+
       </div>
     </div>
   );
 }
-/*
 
-            <>
-              <label className="field-label">Enter PIN</label>
-              <div className="pin-wrapper">
-                {/*Array(4).fill(null).map((_, i) => (
-                  <div key={i} className={`pin-dot ${i === pin.length ? "active" : ""} ${pin[i] ? "" : "empty"}`}>
-                    {pin[i] ? "●" : i === pin.length ? "▌" : "·"}
-                  </div>
-                ))*/ /*}
-              </div>
-
-              {/*PIN  SELCTOR
-                <div className="numpad">
-                {[1,2,3,4,5,6,7,8,9].map((n) => (
-                  <button key={n} className="num-btn" onClick={() => handleNum(String(n))}>{n}</button>
-                ))}
-                <button className="num-btn" style={{ visibility: "hidden" }} />
-                <button className="num-btn" onClick={() => handleNum("0")}>0</button>
-                <button className="num-btn del" onClick={handleDel}>⌫</button>
-              </div>
-                
-            </>
-*/
 
 // ─── Home screen ──────────────────────────────────────────────────────────────
 function HomeScreen({ interviewer, onStartSurvey, sessions, onLogout }) {
@@ -1898,7 +3015,7 @@ function HomeScreen({ interviewer, onStartSurvey, sessions, onLogout }) {
       <StatusBar saving={false} gpsStatus="ready" offlineCount={offlineCount} />
       <div className="topbar">
         <div className="topbar-logo">
-          <img src="./public/logo.ico" alt="" className="logo-mark-sm" />
+          <img src="./logo.ico" alt="" className="logo-mark-sm" />
           <span className="topbar-logo-text">DaroboCollect</span>
         </div>
         <div className="topbar-user">
@@ -2564,6 +3681,7 @@ function InterviewScreen({ survey, interviewer, onBack, onSessionComplete }) {
   );
 }
 
+
 // ─── App root ─────────────────────────────────────────────────────────────────
 export default function Darobo_collect() {
   const [interviewer, setInterviewer] = useState(null);
@@ -2590,6 +3708,7 @@ export default function Darobo_collect() {
     <>
       <style>{styles}</style>
       <div className="app">
+
         {screen === "login" && <LoginScreen onLogin={handleLogin} />}
         {screen === "home" && interviewer && (
           <HomeScreen
