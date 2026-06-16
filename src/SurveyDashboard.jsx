@@ -1750,8 +1750,8 @@ function PreviewTable({ rows, survey }) {
 
 // ── LOGIN PAGE ─────────────────────────────────────────────────────────────────
 function LoginPage({ onLogin }) {
-  const [email, setEmail] = useState("admin@darobo.com");
-  const [password, setPassword] = useState("admin2026");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
