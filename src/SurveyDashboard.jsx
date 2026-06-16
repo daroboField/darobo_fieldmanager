@@ -1357,70 +1357,6 @@ function triggerDownload(content, filename) {
   document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
-// ── MOCK DATA (replace with Firebase fetch in production) ─────────────────────
-/*
-const MOCK_RECORDS = [
-  {
-    id: "resp_1780201375995_hb6exh",
-    Q1: "Yes, I am currently renting / Ndio, ninakodisha sasa hivi",
-    Q2: "KSh 15,001-40,000",
-    Q3: "Only a verbal agreement / Makubaliano ya mdomo tu",
-    Q4: "No, but I worried it could happen / Hapana, lakini niliogopa",
-    Q5: "No / Hapana",
-    Q6: "Always / Wakati wote",
-    Q7: "4",
-    Q8: "Same / Sawa",
-    Q9: "Yes, slightly prefer / Ndio, ninapendelea kidogo",
-    Q10: "Only if landlord pays / Tu kama mwenye nyumba atalipa",
-    Q11: "Smartphone with regular internet / Smartphone na mtandao wa kawaida",
-    Q12: ["A friend or neighbour has used it / Rafiki au jirani amewahi kuitumia", "I can verify it online anytime / Ninaweza kuthibitisha mtandaoni wakati wowote"],
-    Q13: "Yes, slightly prefer / Ndio, ninapendelea kidogo",
-    gps: { lat: -1.2879033, accuracy: 15.94, lng: 36.8828853 },
-    gpsTimestamp: "2026-05-29T04:41:29.670Z",
-    interviewerId: "INT007",
-    interviewerLocation: "Nairobi",
-    interviewerName: "Yvonne Ochieng",
-    notes: { Q4: "She calm" },
-    respondentLocation: "Buruburu",
-    respondentName: "Christine Atieno",
-    respondentPhone: "0790895551",
-    respondentTown: "Nairobi",
-    sessionId: "resp_1780201375995_hb6exh",
-    startedAt: "2026-05-29T04:22:55.995Z",
-    submitted: true,
-    submittedAt: "2026-05-29T04:41:31.000Z",
-    surveyId: "tenant",
-    surveyTitle: "Real Estate — Tenants",
-  },
-  // Additional mock records for demonstration
-  ...[...Array(18)].map((_, i) => ({
-    id: `resp_mock_${i}`,
-    Q1: "Yes, I am currently renting / Ndio, ninakodisha sasa hivi",
-    Q2: ["KSh 0–5,000", "KSh 5,001–15,000", "KSh 15,001–40,000", "KSh 40,001+"][i % 4],
-    Q3: ["Only a verbal agreement / Makubaliano ya mdomo tu", "Simple written agreement", "Formal lawyer lease", "No agreement"][i % 4],
-    Q4: ["No, but I worried it could happen / Hapana, lakini niliogopa", "Yes, minor dispute", "Yes, serious dispute", "No / Hapana"][i % 4],
-    Q6: ["Never / Kamwe", "Rarely / Mara chache", "Sometimes / Mara kwa mara", "Always / Wakati wote"][i % 4],
-    Q7: String((i % 5) + 1),
-    Q8: ["Same / Sawa", "Better protection / Ulinzi bora", "More convenience / Urahisi zaidi"][i % 3],
-    Q13: ["Yes, definitely / Ndio, kabisa", "Yes, slightly prefer / Ndio, ninapendelea kidogo", "Only if landlord pays / Tu kama mwenye nyumba atalipa", "No / Hapana"][i % 4],
-    Q12: i % 2 === 0 ? ["A friend or neighbour has used it / Rafiki au jirani amewahi kuitumia"] : ["I can verify it online anytime / Ninaweza kuthibitisha mtandaoni wakati wowote", "Government endorsement / Inaungwa mkono na serikali"],
-    gps: i % 3 !== 0 ? { lat: -1.28 + Math.random() * 0.1, lng: 36.82 + Math.random() * 0.1, accuracy: 15 } : null,
-    gpsTimestamp: new Date(Date.now() - i * 8.6e7).toISOString(),
-    interviewerId: `INT00${(i % 5) + 1}`,
-    interviewerLocation: ["Nairobi", "Westlands", "Eastlands", "Kasarani"][i % 4],
-    interviewerName: ["Yvonne Ochieng", "James Mwangi", "Aisha Kamau", "Peter Njoroge", "Grace Wanjiru"][i % 5],
-    respondentName: `Respondent ${i + 2}`,
-    respondentPhone: `07${String(Math.floor(Math.random() * 9e7 + 1e7))}`,
-    respondentTown: ["Nairobi", "Westlands", "Buruburu", "Kasarani", "Embakasi"][i % 5],
-    sessionId: `resp_mock_${i}`,
-    startedAt: new Date(Date.now() - i * 8.6e7).toISOString(),
-    submitted: i % 5 !== 0,
-    submittedAt: i % 5 !== 0 ? new Date(Date.now() - i * 8.6e7 + 1.2e6).toISOString() : null,
-    surveyId: ["tenant", "landlord", "agent", "chama"][i % 4],
-    surveyTitle: ["Real Estate — Tenants", "Real Estate — Landlords", "Real Estate — Agents", "Chama & SACCO"][i % 4],
-  })),
-];
-*/
 // ── CHART TOOLTIP ──────────────────────────────────────────────────────────────
 const CT = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -1820,7 +1756,7 @@ function LoginPage({ onLogin }) {
             <div className="login-card-head">
               <div className="login-card-title">Sign in</div>
               <div className="login-card-sub">
-                Enter your credentials to access the dashboard
+                Enter your credentials
               </div>
             </div>
             <form onSubmit={handleLogin} className="lf-form">
@@ -2312,7 +2248,7 @@ body {
   gap: 6px;
 }
 .lf-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #374151;
   text-transform: uppercase;
