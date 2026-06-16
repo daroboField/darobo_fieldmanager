@@ -2361,6 +2361,9 @@ body {
   .login-brand-panel {
     display: none;
   }
+   .sidebar {
+    display: none;
+  }
   .login-card {
     border: none;
     box-shadow: none;
