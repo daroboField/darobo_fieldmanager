@@ -1711,7 +1711,7 @@ function LoginPage({ onLogin }) {
           .eq("email", email.trim())
           .single();
         if (profErr || !profile) {
-          setError("Profile not found. Please contact Darobo R. Center.");
+          setError("Profile not found. Please contact Daropo R. Center.");
           setLoading(false);
           return;
         }
@@ -1731,7 +1731,7 @@ function LoginPage({ onLogin }) {
       <div className="login-shell">
         <div className="login-brand-panel">
           <div className="login-brand-inner">
-            <div className="login-wordmark">DAROBO</div>
+            <div className="login-wordmark">DAROPO</div>
             <div className="login-tagline">
               Transforming data into actionable market intelligence.
             </div>
@@ -1767,7 +1767,7 @@ function LoginPage({ onLogin }) {
                   <input
                     className="lf-input"
                     type="email"
-                    placeholder="you@darobo.com"
+                    placeholder="you@daropo.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -1804,7 +1804,7 @@ function LoginPage({ onLogin }) {
             <div className="lf-register">
               <div className="lf-register-title">No account?</div>
               <div className="lf-register-body">
-                Contact Darobo Research Center to get access credentials.
+                Contact Daropo Research Center to get access credentials.
               </div>
             </div>
           </div>
@@ -1875,7 +1875,7 @@ export function ClientDashboard({ records, user, onLogout }) {
       <style>{dashCss}</style>
       <div className="dash-main">
         <header className="topbar">
-          <span className="tb-brand">DAROBO</span>
+          <span className="tb-brand">DAROPO</span>
           <div className="tb-divider" />
           <span style={{ marginRight: "auto", color: "#fff" }}>
             {" "}
@@ -3370,7 +3370,7 @@ export default function SurveyDashboard() {
   const handleExport = useCallback(() => {
     if (!filteredRows.length) { setExportMsg({ type: "info", text: "No responses to export with current filters." }); return; }
     const csv = buildCSV(filteredRows, activeSurvey);
-    const filename = `darobo_${activeSurveyId}_responses_${new Date().toISOString().slice(0, 10)}.csv`;
+    const filename = `daropo_${activeSurveyId}_responses_${new Date().toISOString().slice(0, 10)}.csv`;
     triggerDownload(csv, filename);
     setExportMsg({ type: "ok", text: `Exported ${filteredRows.length} rows · ${filename}` });
   }, [filteredRows, activeSurvey, activeSurveyId]);
@@ -3415,7 +3415,7 @@ export default function SurveyDashboard() {
       )}
       <div className="dash-main">
         <header className="topbar">
-          <span className="tb-brand">DAROBO</span>
+          <span className="tb-brand">DAROPO</span>
           <div className="tb-divider" />
 
           <span style={{ marginRight: "auto", color: "#fff" }}>
