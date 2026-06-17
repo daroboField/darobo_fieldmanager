@@ -2414,7 +2414,7 @@ body,
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 10px;
+  padding: 10px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.39);
 }
 .tb-brand {
